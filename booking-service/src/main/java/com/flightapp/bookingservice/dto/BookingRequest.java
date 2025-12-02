@@ -16,6 +16,6 @@ public class BookingRequest {
     private Integer numberOfSeats;
     private List<PassengerRequest> passengers;
     private List<String> selectedSeats;
-    private String mealPreference; // VEG or NON_VEG
+    private String mealPreference;
     private LocalDate journeyDate;
 }

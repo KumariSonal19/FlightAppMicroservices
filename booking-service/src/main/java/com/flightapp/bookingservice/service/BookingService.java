@@ -1,36 +1,35 @@
 package com.flightapp.bookingservice.service;
 
-import com.flightapp.bookingservice.entity.Booking;
-import com.flightapp.bookingservice.entity.PassengerInfo;
 import com.flightapp.bookingservice.dto.BookingRequest;
 import com.flightapp.bookingservice.dto.BookingResponse;
-import com.flightapp.bookingservice.dto.PassengerRequest;
+import com.flightapp.bookingservice.entity.Booking;
+import com.flightapp.bookingservice.entity.PassengerInfo;
+import com.flightapp.bookingservice.exception.BadRequestException;
+import com.flightapp.bookingservice.exception.ResourceNotFoundException;
+import com.flightapp.bookingservice.exception.ServiceException;
 import com.flightapp.bookingservice.feign.FlightServiceClient;
 import com.flightapp.bookingservice.messaging.BookingEvent;
 import com.flightapp.bookingservice.messaging.BookingPublisher;
 import com.flightapp.bookingservice.repository.BookingRepository;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class BookingService {
-    @Autowired
-    private BookingRepository bookingRepository;
 
-    @Autowired
-    private FlightServiceClient flightServiceClient;
-
-    @Autowired
-    private BookingPublisher bookingPublisher;
+    private final BookingRepository bookingRepository;
+    private final FlightServiceClient flightServiceClient;
+    private final BookingPublisher bookingPublisher;
 
     @CircuitBreaker(name = "flight-service", fallbackMethod = "bookingFallback")
     public BookingResponse bookFlight(BookingRequest request) {
@@ -38,10 +37,10 @@ public class BookingService {
         try {
             var flightDetails = flightServiceClient.getFlightById(request.getFlightId());
             if (flightDetails == null) {
-                throw new RuntimeException("Flight not found");
+                throw new ResourceNotFoundException("Flight not found");
             }
             if (flightDetails.getAvailableSeats() < request.getNumberOfSeats()) {
-                throw new RuntimeException("Insufficient seats available");
+                throw new BadRequestException("Insufficient seats available");
             }
             
             Booking booking = new Booking();
@@ -58,10 +57,10 @@ public class BookingService {
             booking.setBookingStatus("CONFIRMED");
             booking.setCreatedAt(System.currentTimeMillis());
             booking.setUpdatedAt(System.currentTimeMillis());
-           
+          
             List<PassengerInfo> passengers = request.getPassengers().stream()
                     .map(p -> new PassengerInfo(p.getName(), p.getGender(), p.getAge()))
-                    .collect(Collectors.toList());
+                    .toList();
             booking.setPassengers(passengers);
             
             Booking savedBooking = bookingRepository.save(booking);
@@ -83,13 +82,14 @@ public class BookingService {
             return convertToBookingResponse(savedBooking);
         } catch (Exception e) {
             log.error("Error during flight booking", e);
-            throw new RuntimeException("Booking failed: " + e.getMessage());
+            throw new ServiceException("Booking failed: " + e.getMessage());
         }
     }
 
+    @SuppressWarnings("unused")
     public BookingResponse bookingFallback(BookingRequest request, Exception e) {
         log.error("Circuit breaker triggered for flight booking", e);
-        throw new RuntimeException("Flight service is currently unavailable. Please try again later.");
+        throw new ServiceException("Flight service is currently unavailable. Please try again later.");
     }
 
     public Optional<BookingResponse> getBookingByPnr(String pnr) {
@@ -101,25 +101,25 @@ public class BookingService {
         log.info("Fetching booking history for email: {}", emailId);
         return bookingRepository.findByUserEmail(emailId).stream()
                 .map(this::convertToBookingResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @CircuitBreaker(name = "flight-service", fallbackMethod = "cancelBookingFallback")
     public BookingResponse cancelBooking(String pnr) {
         log.info("Processing cancellation for booking: {}", pnr);
         Optional<Booking> bookingOptional = bookingRepository.findByPnr(pnr);
-        if (!bookingOptional.isPresent()) {
-            throw new RuntimeException("Booking not found");
+        if (bookingOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Booking not found");
         }
         Booking booking = bookingOptional.get();
         LocalDate journeyDate = booking.getJourneyDate();
         LocalDate today = LocalDate.now();
         long daysUntilJourney = ChronoUnit.DAYS.between(today, journeyDate);
         if (daysUntilJourney <= 0) {
-            throw new RuntimeException("Cancellation not allowed. Journey date has passed.");
+            throw new BadRequestException("Cancellation not allowed. Journey date has passed.");
         }
         if (daysUntilJourney < 1) {
-            throw new RuntimeException("Cancellation not allowed. Less than 24 hours before journey.");
+            throw new BadRequestException("Cancellation not allowed. Less than 24 hours before journey.");
         }
         booking.setBookingStatus("CANCELLED");
         booking.setUpdatedAt(System.currentTimeMillis());
@@ -129,9 +129,10 @@ public class BookingService {
         return convertToBookingResponse(cancelledBooking);
     }
 
+    @SuppressWarnings("unused")
     public BookingResponse cancelBookingFallback(String pnr, Exception e) {
         log.error("Circuit breaker triggered for booking cancellation", e);
-        throw new RuntimeException("Flight service is currently unavailable. Cancellation failed.");
+        throw new ServiceException("Flight service is currently unavailable. Cancellation failed.");
     }
 
     private String generatePNR() {

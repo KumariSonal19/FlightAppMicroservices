@@ -21,18 +21,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// @WebMvcTest only loads the Controller layer, making it fast
 @WebMvcTest(BookingController.class)
 public class BookingControllerTest {
 
     @Autowired
-    private MockMvc mockMvc; // Tool to send fake HTTP requests
+    private MockMvc mockMvc; 
 
     @MockBean
-    private BookingService bookingService; // Fake the service
+    private BookingService bookingService; 
 
     @Autowired
-    private ObjectMapper objectMapper; // Converts Objects to JSON
+    private ObjectMapper objectMapper; 
 
     @Test
     void testBookFlight_Endpoint_Created() throws Exception {
@@ -43,15 +42,13 @@ public class BookingControllerTest {
         response.setPnr("PNR_TEST");
         response.setBookingStatus("CONFIRMED");
 
-        // When controller calls service, return success
         when(bookingService.bookFlight(any(BookingRequest.class))).thenReturn(response);
 
-        // Perform POST request
         mockMvc.perform(post("/api/booking/flight/FL123")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated()) // Expect 201 Created
-                .andExpect(jsonPath("$.pnr").value("PNR_TEST")); // Check JSON body
+                .andExpect(status().isCreated()) 
+                .andExpect(jsonPath("$.pnr").value("PNR_TEST")); 
     }
 
     @Test
@@ -88,7 +85,6 @@ public class BookingControllerTest {
 
     @Test
     void testGetBookingHistory_NotFound() throws Exception {
-        // Return empty list
         when(bookingService.getBookingHistory("empty@email.com")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/booking/history/empty@email.com"))

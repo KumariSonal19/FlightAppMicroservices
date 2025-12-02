@@ -3,12 +3,13 @@ package com.flightapp.bookingservice.controller;
 import com.flightapp.bookingservice.dto.BookingRequest;
 import com.flightapp.bookingservice.dto.BookingResponse;
 import com.flightapp.bookingservice.service.BookingService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -16,12 +17,13 @@ import java.util.Optional;
 @RequestMapping("/api/booking")
 @Validated
 @Slf4j
+@RequiredArgsConstructor 
 public class BookingController {
-    @Autowired
-    private BookingService bookingService;
+
+    private final BookingService bookingService;
 
     @PostMapping("/flight/{flightid}")
-    public ResponseEntity<?> bookFlight(@PathVariable("flightid") String flightId, @RequestBody BookingRequest request) {
+    public ResponseEntity<Object> bookFlight(@PathVariable("flightid") String flightId, @RequestBody BookingRequest request) {
         log.info("Request to book flight: {}", flightId);
         try {
             request.setFlightId(flightId);
@@ -34,7 +36,7 @@ public class BookingController {
     }
 
     @GetMapping("/ticket/{pnr}")
-    public ResponseEntity<?> getBookingByPnr(@PathVariable String pnr) {
+    public ResponseEntity<Object> getBookingByPnr(@PathVariable String pnr) {
         log.info("Request to get booking by PNR: {}", pnr);
         Optional<BookingResponse> booking = bookingService.getBookingByPnr(pnr);
         if (booking.isPresent()) {
@@ -44,7 +46,7 @@ public class BookingController {
     }
 
     @GetMapping("/history/{emailId}")
-    public ResponseEntity<?> getBookingHistory(@PathVariable String emailId) {
+    public ResponseEntity<Object> getBookingHistory(@PathVariable String emailId) {
         log.info("Request to get booking history for email: {}", emailId);
         List<BookingResponse> bookings = bookingService.getBookingHistory(emailId);
         if (!bookings.isEmpty()) {
@@ -54,7 +56,7 @@ public class BookingController {
     }
 
     @DeleteMapping("/cancel/{pnr}")
-    public ResponseEntity<?> cancelBooking(@PathVariable String pnr) {
+    public ResponseEntity<Object> cancelBooking(@PathVariable String pnr) {
         log.info("Request to cancel booking: {}", pnr);
         try {
             BookingResponse response = bookingService.cancelBooking(pnr);

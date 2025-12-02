@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
@@ -22,11 +22,10 @@ public class BookingPublisherTest {
     private BookingPublisher bookingPublisher;
 
     @Test
-    void testPublish_Success() {
+    void testPublish() {
         BookingEvent event = new BookingEvent();
         event.setPnr("PNR123");
-
-        bookingPublisher.publishBookingConfirmation(event);
+        assertDoesNotThrow(() -> bookingPublisher.publishBookingConfirmation(event));
 
         verify(rabbitTemplate).convertAndSend(
                 eq(RabbitMQConfig.BOOKING_EXCHANGE),
@@ -34,17 +33,10 @@ public class BookingPublisherTest {
                 eq(event)
         );
     }
-
-    // This tests the "if (rabbitTemplate == null)" block
+    
     @Test
-    void testPublish_NoRabbitTemplate() {
-        // We create an instance manually WITHOUT injecting the RabbitTemplate mock
-        BookingPublisher manualPublisher = new BookingPublisher();
-        
-        BookingEvent event = new BookingEvent();
-        event.setPnr("PNR123");
-
-        // This should run without throwing a NullPointerException
-        manualPublisher.publishBookingConfirmation(event);
+    void testPublish_NoRabbit() {
+        BookingPublisher pub = new BookingPublisher();
+        assertDoesNotThrow(() -> pub.publishBookingConfirmation(new BookingEvent()));
     }
 }
