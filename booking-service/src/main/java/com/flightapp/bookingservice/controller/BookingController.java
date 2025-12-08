@@ -3,6 +3,8 @@ package com.flightapp.bookingservice.controller;
 import com.flightapp.bookingservice.dto.BookingRequest;
 import com.flightapp.bookingservice.dto.BookingResponse;
 import com.flightapp.bookingservice.service.BookingService;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -23,12 +25,13 @@ public class BookingController {
     private final BookingService bookingService;
 
     @PostMapping("/flight/{flightid}")
-    public ResponseEntity<Object> bookFlight(@PathVariable("flightid") String flightId, @RequestBody BookingRequest request) {
+    public ResponseEntity<Object> bookFlight(@PathVariable("flightid") String flightId,@Valid @RequestBody BookingRequest request) {
         log.info("Request to book flight: {}", flightId);
         try {
             request.setFlightId(flightId);
             BookingResponse response = bookingService.bookFlight(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            String message = "Flight Booking successful with the pnr: " + response.getPnr();
+            return ResponseEntity.status(HttpStatus.CREATED).body(message);
         } catch (Exception e) {
             log.error("Booking failed", e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Booking failed: " + e.getMessage());
@@ -61,6 +64,8 @@ public class BookingController {
         try {
             BookingResponse response = bookingService.cancelBooking(pnr);
             return ResponseEntity.ok(response);
+        } catch (com.flightapp.bookingservice.exception.ResourceNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Cancellation failed", e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Cancellation failed: " + e.getMessage());
