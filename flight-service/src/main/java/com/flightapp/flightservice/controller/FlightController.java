@@ -10,7 +10,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -23,21 +27,23 @@ public class FlightController {
     private FlightService flightService;
 
     @PostMapping("/airline/inventory/add")
-    public ResponseEntity<FlightResponse> addFlightInventory(@RequestBody InventoryAddRequest request) {
+    public ResponseEntity<Map<String, String>> addFlightInventory(@Valid @RequestBody InventoryAddRequest request) {
         log.info("Request to add flight inventory");
-        FlightResponse response = flightService.addFlightInventory(request);
+        FlightResponse fullResponse = flightService.addFlightInventory(request);
+        Map<String, String> response = new HashMap<>();
+        response.put("flightId", fullResponse.getFlightId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/search")
-    public ResponseEntity<List<FlightResponse>> searchFlights(@RequestBody FlightSearchRequest request) {
+    public ResponseEntity<List<FlightResponse>> searchFlights(@Valid @RequestBody FlightSearchRequest request) {
         log.info("Request to search flights");
         List<FlightResponse> flights = flightService.searchFlights(request);
         return ResponseEntity.ok(flights);
     }
 
     @GetMapping("/{flightId}")
-    public ResponseEntity<?> getFlightById(@PathVariable String flightId) {
+    public ResponseEntity<Object> getFlightById(@PathVariable String flightId) {
         log.info("Request to get flight by ID: {}", flightId);
         Optional<FlightResponse> flight = flightService.getFlightById(flightId);
         if (flight.isPresent()) {
@@ -47,10 +53,10 @@ public class FlightController {
     }
 
     @PutMapping("/{flightId}/update-seats")
-    public ResponseEntity<String> updateSeats(@PathVariable String flightId, @RequestParam Integer seats) {
-        log.info("Request to update seats for flight: {} by {}", flightId, seats);
+    public ResponseEntity<String> updateSeats(@PathVariable String flightId, @RequestBody List<String> seatNumbers) {
+        log.info("Request to update seats for flight: {}", flightId);
         try {
-            flightService.updateAvailableSeats(flightId, seats);
+            flightService.updateAvailableSeats(flightId, seatNumbers);
             return ResponseEntity.ok("Seats updated successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
@@ -58,10 +64,10 @@ public class FlightController {
     }
 
     @PutMapping("/{flightId}/release-seats")
-    public ResponseEntity<String> releaseSeats(@PathVariable String flightId, @RequestParam Integer seats) {
-        log.info("Request to release seats for flight: {} by {}", flightId, seats);
+    public ResponseEntity<String> releaseSeats(@PathVariable String flightId, @RequestBody List<String> seatNumbers) {
+        log.info("Request to release seats for flight: {}", flightId);
         try {
-            flightService.releaseSeats(flightId, seats);
+            flightService.releaseSeats(flightId, seatNumbers);
             return ResponseEntity.ok("Seats released successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
