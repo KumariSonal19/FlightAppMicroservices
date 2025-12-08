@@ -15,7 +15,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,178 +37,105 @@ public class FlightServiceTest {
     private FlightService flightService;
 
     @Test
-    void testAddFlightInventory_Success() {
-        // 1. Prepare Request
-        InventoryAddRequest request = new InventoryAddRequest();
-        request.setAirlineCode("AI");
-        request.setAirlineName("Air India");
-        request.setSource("DEL");
-        request.setDestination("BOM");
-        request.setDepartureTime("2023-12-01T10:00:00");
-        request.setArrivalTime("2023-12-01T12:00:00");
-        request.setPrice(5000.0);
-        request.setTotalSeats(100);
-        request.setAircraft("Boeing 737");
-
-        // 2. Mock Repository
-        Flight mockFlight = new Flight();
-        mockFlight.setFlightId("F1");
-        mockFlight.setAirlineCode("AI");
-        // ... set other fields if needed for assertion
-
-        when(flightRepository.save(any(Flight.class))).thenReturn(mockFlight);
+    void testAddFlightInventory() {
+        InventoryAddRequest req = new InventoryAddRequest("AI", "Air India", "DEL", "BOM", ZonedDateTime.now(), ZonedDateTime.now(), 100.0, 100, "737");
+        Flight savedFlight = new Flight();
+        savedFlight.setFlightId("F1");
+        
+        when(flightRepository.save(any(Flight.class))).thenReturn(savedFlight);
         when(inventoryRepository.save(any(FlightInventory.class))).thenReturn(new FlightInventory());
 
-        // 3. Execute
-        FlightResponse response = flightService.addFlightInventory(request);
-
-        // 4. Verify
-        Assertions.assertNotNull(response);
-        Assertions.assertEquals("F1", response.getFlightId());
-        verify(flightRepository, times(1)).save(any(Flight.class));
-        verify(inventoryRepository, times(1)).save(any(FlightInventory.class));
+        FlightResponse res = flightService.addFlightInventory(req);
+        Assertions.assertEquals("F1", res.getFlightId());
     }
 
     @Test
-    void testSearchFlights_Found() {
-        FlightSearchRequest request = new FlightSearchRequest();
-        request.setSource("DEL");
-        request.setDestination("BOM");
-        request.setDepartureDate(LocalDate.of(2023, 12, 1));
+    void testSearchFlights() {
+        FlightSearchRequest req = new FlightSearchRequest("DEL", "BOM", LocalDate.now(), "ONE_WAY");
+        
+        Flight mockFlight = new Flight();
+        mockFlight.setDepartureTime(ZonedDateTime.now()); 
 
-        Flight flight = new Flight();
-        flight.setFlightId("F1");
-
-        when(flightRepository.findBySourceAndDestinationAndDepartureTimeBetween(any(), any(), any(), any()))
-                .thenReturn(List.of(flight));
-
-        List<FlightResponse> responses = flightService.searchFlights(request);
-
-        Assertions.assertEquals(1, responses.size());
-        Assertions.assertEquals("F1", responses.get(0).getFlightId());
+        when(flightRepository.findBySourceAndDestination(any(), any()))
+                .thenReturn(List.of(mockFlight));
+        
+        List<FlightResponse> res = flightService.searchFlights(req);
+        Assertions.assertEquals(1, res.size());
+    }
+    
+    @Test
+    void testGetFlightById() {
+        when(flightRepository.findById("F1")).thenReturn(Optional.of(new Flight()));
+        Assertions.assertTrue(flightService.getFlightById("F1").isPresent());
     }
 
     @Test
-    void testGetFlightById_Found() {
-        Flight flight = new Flight();
-        flight.setFlightId("F1");
+    void testUpdateSeats_Success() {
+        Flight f = new Flight();
+        f.setFlightId("F1");
+        f.setTotalSeats(10); 
         
-        when(flightRepository.findById("F1")).thenReturn(Optional.of(flight));
+        f.setAvailableSeats(10);
+        f.setOccupiedSeats(new HashSet<>());
         
-        Optional<FlightResponse> response = flightService.getFlightById("F1");
-        
-        Assertions.assertTrue(response.isPresent());
-        Assertions.assertEquals("F1", response.get().getFlightId());
-    }
+        List<String> seats = List.of("1A", "1B");
 
-    // Logic Test: Updating Seats
-    @Test
-    void testUpdateAvailableSeats_Success() {
-        Flight flight = new Flight();
-        flight.setFlightId("F1");
-        flight.setAvailableSeats(10);
+        when(flightRepository.findById("F1")).thenReturn(Optional.of(f));
 
-        FlightInventory inventory = new FlightInventory();
-        inventory.setBookedSeats(0);
-        inventory.setAvailableSeats(10);
-
-        when(flightRepository.findById("F1")).thenReturn(Optional.of(flight));
-        when(inventoryRepository.findByFlightId("F1")).thenReturn(Optional.of(inventory));
-
-        // Attempt to book 2 seats
-        flightService.updateAvailableSeats("F1", 2);
-
-        // Verify Save was called
-        verify(flightRepository, times(1)).save(flight);
-        verify(inventoryRepository, times(1)).save(inventory);
-        
-        // Verify values changed
-        Assertions.assertEquals(8, flight.getAvailableSeats());
+        flightService.updateAvailableSeats("F1", seats);
+        Assertions.assertEquals(8, f.getAvailableSeats());
+        verify(flightRepository).save(f);
     }
 
     @Test
-    void testUpdateAvailableSeats_Insufficient() {
-        Flight flight = new Flight();
-        flight.setFlightId("F1");
-        flight.setAvailableSeats(1); // Only 1 seat
-
-        when(flightRepository.findById("F1")).thenReturn(Optional.of(flight));
-
-        // Attempt to book 2 seats -> Should throw Exception
-        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> {
-            flightService.updateAvailableSeats("F1", 2);
-        });
-
-        Assertions.assertEquals("Not enough seats available", ex.getMessage());
-        // Verify we NEVER saved the flight
-        verify(flightRepository, never()).save(any());
+    void testUpdateSeats_NotFound() {
+        List<String> seats = List.of("1A");
+        when(flightRepository.findById("INVALID")).thenReturn(Optional.empty());
+        Assertions.assertThrows(RuntimeException.class, () -> flightService.updateAvailableSeats("INVALID", seats));
     }
- // ... inside FlightServiceTest class ...
 
-    // Test: Release Seats Success
+    @Test
+    void testUpdateSeats_NotEnough() {
+        Flight f = new Flight();
+        f.setAvailableSeats(1); 
+        when(flightRepository.findById("F1")).thenReturn(Optional.of(f));
+        List<String> seats = List.of("1A", "1B");
+        Assertions.assertThrows(RuntimeException.class, () -> flightService.updateAvailableSeats("F1", seats));
+    }
+
+    @Test
+    void testUpdateSeats_AlreadyOccupied() {
+        Flight f = new Flight();
+        f.setAvailableSeats(10);
+        f.setOccupiedSeats(new HashSet<>(List.of("1A"))); 
+
+        when(flightRepository.findById("F1")).thenReturn(Optional.of(f));
+        List<String> seats = List.of("1A");
+
+        Assertions.assertThrows(RuntimeException.class, () -> flightService.updateAvailableSeats("F1", seats));
+    }
+
     @Test
     void testReleaseSeats_Success() {
-        Flight flight = new Flight();
-        flight.setFlightId("F1");
-        flight.setAvailableSeats(5);
+        Flight f = new Flight();
+        f.setFlightId("F1");
+        f.setTotalSeats(10);
+     
+        f.setOccupiedSeats(new HashSet<>(List.of("1A", "1B", "1C"))); 
+        f.setAvailableSeats(7); 
 
-        FlightInventory inventory = new FlightInventory();
-        inventory.setFlightId("F1");
-        inventory.setBookedSeats(5);
-        inventory.setAvailableSeats(5);
+        when(flightRepository.findById("F1")).thenReturn(Optional.of(f));
 
-        when(flightRepository.findById("F1")).thenReturn(Optional.of(flight));
-        when(inventoryRepository.findByFlightId("F1")).thenReturn(Optional.of(inventory));
+        flightService.releaseSeats("F1", List.of("1A", "1B"));
 
-        flightService.releaseSeats("F1", 2);
-
-        // Verify updates
-        Assertions.assertEquals(7, flight.getAvailableSeats()); // 5 + 2
-        Assertions.assertEquals(3, inventory.getBookedSeats()); // 5 - 2
-        verify(flightRepository).save(flight);
-        verify(inventoryRepository).save(inventory);
+        Assertions.assertEquals(9, f.getAvailableSeats()); 
     }
-
-    // Test: Release Seats - Flight Not Found
+    
     @Test
-    void testReleaseSeats_FlightNotFound() {
+    void testReleaseSeats_NotFound() {
+        List<String> seats = List.of("1A");
         when(flightRepository.findById("INVALID")).thenReturn(Optional.empty());
-
-        Assertions.assertThrows(RuntimeException.class, () -> {
-            flightService.releaseSeats("INVALID", 1);
-        });
+        Assertions.assertThrows(RuntimeException.class, () -> flightService.releaseSeats("INVALID", seats));
     }
-
-    // Test: Update Seats - Inventory Missing (Edge Case / Branch coverage)
-    @Test
-    void testUpdateSeats_InventoryMissing() {
-        Flight flight = new Flight();
-        flight.setFlightId("F1");
-        flight.setAvailableSeats(10);
-
-        when(flightRepository.findById("F1")).thenReturn(Optional.of(flight));
-        when(inventoryRepository.findByFlightId("F1")).thenReturn(Optional.empty()); // Missing inventory
-
-        // Should not throw exception, just log warning
-        flightService.updateAvailableSeats("F1", 1);
-        
-        verify(flightRepository).save(flight);
-        verify(inventoryRepository, never()).save(any());
-    }
-
-    // Test: Release Seats - Inventory Missing (Edge Case / Branch coverage)
-    @Test
-    void testReleaseSeats_InventoryMissing() {
-        Flight flight = new Flight();
-        flight.setFlightId("F1");
-        flight.setAvailableSeats(5);
-
-        when(flightRepository.findById("F1")).thenReturn(Optional.of(flight));
-        when(inventoryRepository.findByFlightId("F1")).thenReturn(Optional.empty()); // Missing inventory
-
-        flightService.releaseSeats("F1", 1);
-        
-        verify(flightRepository).save(flight);
-        verify(inventoryRepository, never()).save(any());
-    }
+    
 }

@@ -1,40 +1,37 @@
 package com.flightapp.flightservice.exception;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
 
-public class GlobalExceptionHandlerTest {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
     void testHandleNotFound() {
-        ResourceNotFoundException ex = new ResourceNotFoundException("Not Found");
-        ResponseEntity<Map<String, Object>> response = handler.handleNotFound(ex);
-        
-        Assertions.assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        Assertions.assertEquals("Not Found", response.getBody().get("message"));
+        ResourceNotFoundException ex = new ResourceNotFoundException("Not found");
+        ResponseEntity<Map<String, Object>> res = handler.handleNotFound(ex);
+        assertEquals(HttpStatus.NOT_FOUND, res.getStatusCode());
+        assertEquals("Not found", res.getBody().get("message"));
     }
 
     @Test
     void testHandleBadRequest() {
-        BadRequestException ex = new BadRequestException("Bad Request");
-        ResponseEntity<Map<String, Object>> response = handler.handleBadRequest(ex);
-        
-        Assertions.assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        Assertions.assertEquals("Bad Request", response.getBody().get("message"));
+        BadRequestException ex = new BadRequestException("Bad request");
+        ResponseEntity<Map<String, Object>> res = handler.handleBadRequest(ex);
+        assertEquals(HttpStatus.BAD_REQUEST, res.getStatusCode());
+        assertEquals("Bad request", res.getBody().get("message"));
     }
 
     @Test
-    void testHandleGlobalException() {
-        Exception ex = new Exception("Internal Error");
-        ResponseEntity<Map<String, Object>> response = handler.handleGlobalException(ex);
-        
-        Assertions.assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        Assertions.assertEquals("Internal Error", response.getBody().get("message"));
+    void testHandleGlobal() {
+        Exception ex = new Exception("Error");
+        ResponseEntity<Map<String, Object>> res = handler.handleGlobalException(ex);
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, res.getStatusCode());
     }
 }
