@@ -11,6 +11,7 @@ The system consists of the following microservices:
 | **Config Server** | `8888` | Centralized configuration for all services. |
 | **Eureka Server** | `8761` | Service Registry & Discovery. |
 | **API Gateway** | `8081` | Single entry point, handles routing and load balancing. |
+| **Auth Service** | `8084` | Handles User Registration, Login, and JWT Token Generation. |
 | **Flight Service** | `8083` | Manages flight inventory, searching, and seat availability (MongoDB). |
 | **Booking Service** | `8082` | Handles ticket booking, passenger info, and email notifications (MongoDB + RabbitMQ). |
 
@@ -59,3 +60,4 @@ Before running the application, ensure you have the following installed and runn
 - **Booking History by Email**  
   `GET /api/flight/booking/history/{email}`  
   Streams all past bookings for a user via Flux response.
+  
