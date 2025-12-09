@@ -1,5 +1,8 @@
 package com.flightapp.bookingservice.entity;
 
+import com.flightapp.bookingservice.enums.BookingStatus;
+import com.flightapp.bookingservice.enums.MealPreference;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,9 +25,9 @@ public class Booking {
     private Integer numberOfSeats;
     private List<PassengerInfo> passengers;
     private List<String> selectedSeats;
-    private String mealPreference; 
+    private MealPreference mealPreference; 
     private Double totalPrice;
-    private String bookingStatus; 
+    private BookingStatus bookingStatus; 
     private LocalDate journeyDate;
     private Long createdAt;
     private Long updatedAt;

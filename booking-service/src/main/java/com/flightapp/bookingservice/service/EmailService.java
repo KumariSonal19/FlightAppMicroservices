@@ -34,13 +34,11 @@ public class EmailService {
             String body = String.format("""
                 Dear %s,
                 
-                Your flight booking is confirmed!
+                Your flight booking is confirmed.
                 PNR: %s
                 Flight ID: %s
                 Seats: %d
-                Total Price: $%.2f
-                
-                Have a safe journey!
+                Total Price: Rs.%.2f
                 """, 
                 event.getUserName(), event.getPnr(), event.getFlightId(), event.getNumberOfSeats(), event.getTotalPrice());
 

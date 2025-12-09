@@ -4,6 +4,11 @@ import com.flightapp.bookingservice.dto.BookingRequest;
 import com.flightapp.bookingservice.dto.BookingResponse;
 import com.flightapp.bookingservice.dto.PassengerRequest;
 import com.flightapp.bookingservice.entity.Booking;
+import com.flightapp.bookingservice.enums.BookingStatus;
+import com.flightapp.bookingservice.enums.MealPreference;
+import com.flightapp.bookingservice.exception.BadRequestException;
+import com.flightapp.bookingservice.exception.ResourceNotFoundException;
+import com.flightapp.bookingservice.exception.ServiceUnavailableExceptionTest;
 import com.flightapp.bookingservice.feign.FlightDTO;
 import com.flightapp.bookingservice.feign.FlightServiceClient;
 import com.flightapp.bookingservice.messaging.BookingEvent;
@@ -14,11 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,8 +51,9 @@ public class BookingServiceTest {
         request.setJourneyDate(LocalDate.now().plusDays(5));
         request.setUserEmail("test@test.com");
         request.setUserName("John Doe");
-        request.setPassengers(List.of(new PassengerRequest("John", "M", 30)));
+        request.setPassengers(List.of(new PassengerRequest("P1", "M", 30), new PassengerRequest("P2", "F", 25)));
         request.setSelectedSeats(List.of("1A", "1B"));
+        request.setMealPreference(MealPreference.VEG); 
 
         FlightDTO mockFlight = new FlightDTO();
         mockFlight.setFlightId("FL123");
@@ -60,7 +64,7 @@ public class BookingServiceTest {
         
         Booking savedBooking = new Booking();
         savedBooking.setPnr("PNR123");
-        savedBooking.setBookingStatus("CONFIRMED");
+        savedBooking.setBookingStatus(BookingStatus.CONFIRMED); 
         savedBooking.setTotalPrice(200.0);
         
         when(bookingRepository.save(any(Booking.class))).thenReturn(savedBooking);
@@ -68,10 +72,9 @@ public class BookingServiceTest {
         BookingResponse response = bookingService.bookFlight(request);
 
         Assertions.assertNotNull(response);
-        Assertions.assertEquals("CONFIRMED", response.getBookingStatus());
+        Assertions.assertEquals(BookingStatus.CONFIRMED, response.getBookingStatus());
         Assertions.assertEquals("PNR123", response.getPnr());
-
-        verify(flightServiceClient, times(1)).updateFlightSeats("FL123", 2);
+        verify(flightServiceClient, times(1)).updateFlightSeats(eq("FL123"), anyList());
         verify(bookingPublisher, times(1)).publishBookingConfirmation(any(BookingEvent.class));
     }
 
@@ -79,23 +82,68 @@ public class BookingServiceTest {
     void testBookFlight_InsufficientSeats() {
         BookingRequest request = new BookingRequest();
         request.setFlightId("FL123");
-        request.setNumberOfSeats(5);
+        request.setNumberOfSeats(5); 
+        request.setPassengers(List.of(
+            new PassengerRequest("P1", "M", 20),
+            new PassengerRequest("P2", "M", 20),
+            new PassengerRequest("P3", "M", 20),
+            new PassengerRequest("P4", "M", 20),
+            new PassengerRequest("P5", "M", 20)
+        ));
+
+        request.setSelectedSeats(List.of("1A", "1B", "1C", "1D", "1E"));
 
         FlightDTO mockFlight = new FlightDTO();
         mockFlight.setAvailableSeats(2); 
 
         when(flightServiceClient.getFlightById("FL123")).thenReturn(mockFlight);
+        com.flightapp.bookingservice.exception.BadRequestException exception = 
+            org.junit.jupiter.api.Assertions.assertThrows(
+                com.flightapp.bookingservice.exception.BadRequestException.class, 
+                () -> bookingService.bookFlight(request)
+            );
 
-        RuntimeException exception = Assertions.assertThrows(RuntimeException.class, () -> {
+        Assertions.assertTrue(exception.getMessage().contains("Insufficient seats available"));
+        
+        verify(bookingRepository, never()).save(any());
+    }
+    
+    @Test
+    void testBookFlight_PassengerMismatch() {
+        BookingRequest request = new BookingRequest();
+        request.setNumberOfSeats(2); 
+        request.setPassengers(List.of(new PassengerRequest("John", "M", 30))); 
+
+        BadRequestException ex = Assertions.assertThrows(BadRequestException.class, () -> {
             bookingService.bookFlight(request);
         });
 
-        Assertions.assertEquals("Booking failed: Insufficient seats available", exception.getMessage());
-        
-        verify(bookingRepository, never()).save(any());
-        verify(bookingPublisher, never()).publishBookingConfirmation(any());
+        Assertions.assertTrue(ex.getMessage().contains("must match the number of passengers"));
+        verify(flightServiceClient, never()).getFlightById(any());
     }
 
+    @Test
+    void testBookFlight_DuplicateSeats() {
+        BookingRequest request = new BookingRequest();
+        request.setFlightId("FL123");
+        request.setNumberOfSeats(2);
+        request.setPassengers(List.of(
+            new PassengerRequest("P1", "M", 20), 
+            new PassengerRequest("P2", "M", 20)
+        ));
+ 
+        request.setSelectedSeats(List.of("1A", "1A")); 
+
+        com.flightapp.bookingservice.exception.BadRequestException ex = 
+            org.junit.jupiter.api.Assertions.assertThrows(
+                com.flightapp.bookingservice.exception.BadRequestException.class, 
+                () -> bookingService.bookFlight(request)
+            );
+
+        org.junit.jupiter.api.Assertions.assertEquals("Duplicate seats selected! Each passenger must have a unique seat.", ex.getMessage());
+        verify(flightServiceClient, never()).getFlightById(any());
+    }
+    
     @Test
     void testCancelBooking_Success() {
         String pnr = "PNR123";
@@ -104,37 +152,25 @@ public class BookingServiceTest {
         existingBooking.setFlightId("FL123");
         existingBooking.setNumberOfSeats(2);
         existingBooking.setJourneyDate(LocalDate.now().plusDays(10));
-        existingBooking.setBookingStatus("CONFIRMED");
+        existingBooking.setBookingStatus(BookingStatus.CONFIRMED); 
+        existingBooking.setSelectedSeats(List.of("1A", "1B"));
 
         when(bookingRepository.findByPnr(pnr)).thenReturn(Optional.of(existingBooking));
-        
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArguments()[0]);
 
         BookingResponse response = bookingService.cancelBooking(pnr);
 
-        Assertions.assertEquals("CANCELLED", response.getBookingStatus());
-        verify(flightServiceClient, times(1)).releaseFlightSeats("FL123", 2);
+        Assertions.assertEquals(BookingStatus.CANCELLED, response.getBookingStatus());
+        verify(flightServiceClient, times(1)).releaseFlightSeats(eq("FL123"), anyList());
     }
-    @Test
-    void testBookingFallback() {
-        BookingRequest request = new BookingRequest();
-        RuntimeException ex = new RuntimeException("Simulated Failure");
 
-        RuntimeException result = Assertions.assertThrows(RuntimeException.class, () -> {
-            bookingService.bookingFallback(request, ex);
-        });
-
-        Assertions.assertEquals("Flight service is currently unavailable. Please try again later.", result.getMessage());
-    }
-    
     @Test
     void testCancelBooking_NotFound() {
         when(bookingRepository.findByPnr("INVALID_PNR")).thenReturn(Optional.empty());
 
-        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> {
+        Assertions.assertThrows(ResourceNotFoundException.class, () -> {
             bookingService.cancelBooking("INVALID_PNR");
         });
-        Assertions.assertEquals("Booking not found", ex.getMessage());
     }
 
     @Test
@@ -142,27 +178,30 @@ public class BookingServiceTest {
         Booking oldBooking = new Booking();
         oldBooking.setPnr("PNR_OLD");
         oldBooking.setJourneyDate(LocalDate.now().minusDays(1)); 
+        oldBooking.setBookingStatus(BookingStatus.CONFIRMED);
 
         when(bookingRepository.findByPnr("PNR_OLD")).thenReturn(Optional.of(oldBooking));
 
-        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> {
+        Assertions.assertThrows(BadRequestException.class, () -> {
             bookingService.cancelBooking("PNR_OLD");
         });
-        Assertions.assertEquals("Cancellation not allowed. Journey date has passed.", ex.getMessage());
     }
 
     @Test
-    void testCancelBooking_TooLate() {
-        Booking lateBooking = new Booking();
-        lateBooking.setPnr("PNR_LATE");
-        lateBooking.setJourneyDate(LocalDate.now()); 
+    void testCancelBooking_AlreadyCancelled() {
+        String pnr = "PNR_ALREADY_CANCELLED";
+        Booking booking = new Booking();
+        booking.setPnr(pnr);
+        booking.setBookingStatus(BookingStatus.CANCELLED); 
 
-        when(bookingRepository.findByPnr("PNR_LATE")).thenReturn(Optional.of(lateBooking));
+        when(bookingRepository.findByPnr(pnr)).thenReturn(Optional.of(booking));
 
-        RuntimeException ex = Assertions.assertThrows(RuntimeException.class, () -> {
-            bookingService.cancelBooking("PNR_LATE");
-        });
-        Assertions.assertEquals("Cancellation not allowed. Journey date has passed.", ex.getMessage()); 
+        ResourceNotFoundException ex = Assertions.assertThrows(
+                ResourceNotFoundException.class, 
+                () -> bookingService.cancelBooking(pnr)
+        );
+
+        Assertions.assertEquals("Ticket with pnr " + pnr + " already cancelled", ex.getMessage());
     }
 
     @Test
@@ -179,17 +218,17 @@ public class BookingServiceTest {
         Assertions.assertEquals(2, result.size());
         Assertions.assertEquals("PNR1", result.get(0).getPnr());
     }
+    
     @Test
-    void testFallbacks() {
-        BookingRequest req = new BookingRequest();
-        RuntimeException ex = new RuntimeException("Test");
-   
-        RuntimeException res1 = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> 
-            bookingService.bookingFallback(req, ex));
-        org.junit.jupiter.api.Assertions.assertTrue(res1.getMessage().contains("unavailable"));
+    void testBookingFallback() {
+        BookingRequest request = new BookingRequest();
+        RuntimeException ex = new RuntimeException("Simulated Failure");
+        
+        RuntimeException result = Assertions.assertThrows(
+            ServiceUnavailableExceptionTest.class, 
+            () -> bookingService.bookingFallback(request, ex)
+        );
 
-        RuntimeException res2 = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> 
-            bookingService.cancelBookingFallback("PNR", ex));
-        org.junit.jupiter.api.Assertions.assertTrue(res2.getMessage().contains("unavailable"));
+        Assertions.assertEquals("Flight service is currently unavailable. Please try again later.", result.getMessage());
     }
 }
