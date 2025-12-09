@@ -97,7 +97,7 @@ services:
       - SPRING_APPLICATION_NAME=api-gateway
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      # same JWT secret as auth-service
+      
       - APP_JWTSECRET=MySuperSecretKeyForFlightApp123456789012345678901234567890
 
 volumes:
