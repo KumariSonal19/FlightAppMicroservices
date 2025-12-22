@@ -1,5 +1,6 @@
 package com.flightapp.flightservice.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -7,7 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.ZonedDateTime; 
+import java.time.ZonedDateTime;
 
 @Data
 @NoArgsConstructor
@@ -26,14 +27,16 @@ public class InventoryAddRequest {
     @NotBlank(message = "Destination is required")
     private String destination;
 
-    @NotNull(message = "Departure Time is required") 
-    private ZonedDateTime departureTime; 
+    @NotNull(message = "Departure Time is required")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
+    private ZonedDateTime departureTime;
 
-    @NotNull(message = "Arrival Time is required")   
-    private ZonedDateTime arrivalTime;   
-    
-    @NotNull(message = "Price is required") 
-    @Positive(message = "Price must be greater than zero") 
+    @NotNull(message = "Arrival Time is required")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
+    private ZonedDateTime arrivalTime;
+
+    @NotNull(message = "Price is required")
+    @Positive(message = "Price must be greater than zero")
     private Double price;
 
     @NotNull(message = "Total Seats is required")

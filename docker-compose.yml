@@ -5,7 +5,7 @@ services:
     image: mongo:6
     container_name: mongodb
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongo_data:/data/db
 
@@ -22,7 +22,7 @@ services:
     ports:
       - "8761:8761"
     environment:
-      - SPRING_APPLICATION_NAME=eureka-server
+      - SPRING_PROFILES_ACTIVE=docker
 
   config-server:
     build: ./config-server
@@ -32,8 +32,7 @@ services:
     depends_on:
       - eureka-server
     environment:
-      - SPRING_APPLICATION_NAME=config-server
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_PROFILES_ACTIVE=docker
 
   auth-service:
     build: ./auth-service
@@ -45,10 +44,7 @@ services:
       - eureka-server
       - config-server
     environment:
-      - SPRING_APPLICATION_NAME=auth-service
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/auth_db
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_PROFILES_ACTIVE=docker
 
   flight-service:
     build: ./flight-service
@@ -60,10 +56,7 @@ services:
       - eureka-server
       - config-server
     environment:
-      - SPRING_APPLICATION_NAME=flight-service
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/flight_db
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_PROFILES_ACTIVE=docker
 
   booking-service:
     build: ./booking-service
@@ -76,11 +69,7 @@ services:
       - eureka-server
       - config-server
     environment:
-      - SPRING_APPLICATION_NAME=booking-service
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/booking_db
-      - SPRING_RABBITMQ_HOST=rabbitmq
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_PROFILES_ACTIVE=docker
 
   api-gateway:
     build: ./api-gateway
@@ -94,10 +83,7 @@ services:
       - booking-service
       - auth-service
     environment:
-      - SPRING_APPLICATION_NAME=api-gateway
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      
+      - SPRING_PROFILES_ACTIVE=docker
       - APP_JWTSECRET=MySuperSecretKeyForFlightApp123456789012345678901234567890
 
 volumes:
