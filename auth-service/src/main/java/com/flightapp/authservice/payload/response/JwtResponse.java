@@ -17,12 +17,20 @@ public class JwtResponse {
     private String username;
     private String email;
     private List<String> roles;
-
-    public JwtResponse(String id, String username, String email, List<String> roles, String token) {
+    private boolean passwordExpired;
+    
+    public JwtResponse(String id, String username, String email, List<String> roles, String token,boolean passwordExpired) {
         this.token = token;
         this.id = id;
         this.username = username;
         this.email = email;
         this.roles = roles;
+        this.passwordExpired = passwordExpired;
     }
+    public String getToken() { return token; }
+    public String getEmail() { return email; }
+    public String getUsername() { return username; }
+    public boolean isPasswordExpired() { return passwordExpired; }
+    
+    
 }

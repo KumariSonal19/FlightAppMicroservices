@@ -43,6 +43,8 @@ public class User {
     @DBRef
     private Set<Role> roles = new HashSet<>();
 
+    private Long lastPasswordReset;
+    
     private Long createdAt;
 
     private Long updatedAt;
@@ -53,5 +55,9 @@ public class User {
         this.password = password;
         this.createdAt = System.currentTimeMillis();
         this.updatedAt = System.currentTimeMillis();
+        this.lastPasswordReset = System.currentTimeMillis();
     }
+    
+    public Long getLastPasswordReset() { return lastPasswordReset; }
+    public void setLastPasswordReset(Long lastPasswordReset) { this.lastPasswordReset = lastPasswordReset; }
 }

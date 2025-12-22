@@ -12,6 +12,7 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,13 +31,11 @@ public class WebSecurityConfig {
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
-        log.debug("Initializing JWT Authentication Filter");
         return new AuthTokenFilter();
     }
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        log.debug("Configuring DAO Authentication Provider");
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
@@ -45,7 +44,6 @@ public class WebSecurityConfig {
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        log.debug("Creating Authentication Manager");
         return authConfig.getAuthenticationManager();
     }
 
@@ -56,15 +54,32 @@ public class WebSecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        log.debug("Configuring Security Filter Chain");
         http
-            .csrf(csrf -> csrf.disable())
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // ❌ Disable CORS in Auth Service (Gateway handles it)
+            .cors(AbstractHttpConfigurer::disable)
+            
+            // ✅ Disable CSRF (using JWT)
+            .csrf(AbstractHttpConfigurer::disable)
+
+            // ✅ Handle unauthorized access
+            .exceptionHandling(exception -> 
+                exception.authenticationEntryPoint(unauthorizedHandler)
+            )
+
+            // ✅ Stateless session
+            .sessionManagement(session -> 
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+
             .authorizeHttpRequests(auth -> auth
+                // Allow OPTIONS for preflight (just in case Gateway passes them through)
+                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+
+                // ✅ MATCHERS: Ensure these match exactly what Gateway forwards
+                // If Gateway sends "/api/auth/signin", these must match "/api/auth/**"
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
-                .requestMatchers("/error").permitAll()
+
                 .anyRequest().authenticated()
             );
 
@@ -73,5 +88,4 @@ public class WebSecurityConfig {
 
         return http.build();
     }
-
 }
