@@ -41,8 +41,6 @@ public class AuthService {
     @Autowired
     JwtUtils jwtUtils;
 
- // Inside com.flightapp.authservice.service.AuthService
-
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
@@ -54,18 +52,15 @@ public class AuthService {
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
-
-        // ✅ NEW LOGIC STARTS HERE
-        boolean isPasswordExpired = false;
         
-        // 1. Fetch the user entity to get 'lastPasswordReset'
+        boolean isPasswordExpired = false;
+      
         User user = userRepository.findById(userDetails.getId()).orElse(null);
         
         if (user != null && user.getLastPasswordReset() != null) {
-            // 2. Define expiration time (1 Day in Milliseconds)
+          
             long EXPIRATION_TIME = 24 * 60 * 60 * 1000L; 
-            
-            // 3. Check difference
+           
             long timeDiff = System.currentTimeMillis() - user.getLastPasswordReset();
             
             System.out.println("DEBUG: Current Time: " + System.currentTimeMillis());
@@ -78,7 +73,6 @@ public class AuthService {
             }
         }
 
-        // 4. Update Constructor Call (Pass 'isPasswordExpired' at the end)
         return new JwtResponse(
                 userDetails.getId(),
                 userDetails.getUsername(),
