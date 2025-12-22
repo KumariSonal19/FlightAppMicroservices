@@ -18,8 +18,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
         return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
     }
-    
-    
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiError> handleBadRequest(BadRequestException ex, HttpServletRequest req) {
@@ -53,8 +51,8 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
     }
     
-    @ExceptionHandler(ServiceUnavailableExceptionTest.class)
-    public ResponseEntity<ApiError> handleServiceUnavailable(ServiceUnavailableExceptionTest ex, HttpServletRequest req) {
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiError> handleServiceUnavailable(ServiceUnavailableException ex, HttpServletRequest req) {
         ApiError error = new ApiError(null, HttpStatus.SERVICE_UNAVAILABLE.value(), "Service Unavailable",
                 ex.getMessage(), req.getRequestURI(), null);
         return new ResponseEntity<>(error, HttpStatus.SERVICE_UNAVAILABLE);

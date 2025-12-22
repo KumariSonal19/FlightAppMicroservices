@@ -8,7 +8,7 @@ import com.flightapp.bookingservice.enums.BookingStatus;
 import com.flightapp.bookingservice.exception.BadRequestException;
 import com.flightapp.bookingservice.exception.ResourceNotFoundException;
 import com.flightapp.bookingservice.exception.ServiceException;
-import com.flightapp.bookingservice.exception.ServiceUnavailableExceptionTest;
+import com.flightapp.bookingservice.exception.ServiceUnavailableException;
 import com.flightapp.bookingservice.feign.FlightServiceClient;
 import com.flightapp.bookingservice.messaging.BookingEvent;
 import com.flightapp.bookingservice.messaging.BookingPublisher;
@@ -37,13 +37,15 @@ public class BookingService {
     public BookingResponse bookFlight(BookingRequest request) {
         log.info("Processing flight booking for flight: {}", request.getFlightId());
 
-        // --- VALIDATION: Perform checks BEFORE entering the try block ---
         if (request.getNumberOfSeats() == 0) {
             throw new BadRequestException("Number of seats must be greater than 0");
         }
         if (request.getPassengers() == null || request.getNumberOfSeats() != request.getPassengers().size()) {
-            throw new BadRequestException("Number of seats (" + request.getNumberOfSeats() + ") must match the number of passengers provided (" + 
-                                          (request.getPassengers() == null ? 0 : request.getPassengers().size()) + ")");
+            throw new BadRequestException(
+                    "Number of seats (" + request.getNumberOfSeats() +
+                    ") must match the number of passengers provided (" +
+                    (request.getPassengers() == null ? 0 : request.getPassengers().size()) + ")"
+            );
         }
         java.util.Set<String> uniqueSeats = new java.util.HashSet<>(request.getSelectedSeats());
         if (uniqueSeats.size() != request.getSelectedSeats().size()) {
@@ -58,7 +60,6 @@ public class BookingService {
             if (flightDetails.getAvailableSeats() < request.getNumberOfSeats()) {
                 throw new BadRequestException("Insufficient seats available");
             }
-            
             Booking booking = new Booking();
             booking.setBookingId(UUID.randomUUID().toString());
             booking.setPnr(generatePNR());
@@ -73,31 +74,31 @@ public class BookingService {
             booking.setBookingStatus(BookingStatus.CONFIRMED);
             booking.setCreatedAt(System.currentTimeMillis());
             booking.setUpdatedAt(System.currentTimeMillis());
-            
+
             List<PassengerInfo> passengers = request.getPassengers().stream()
                     .map(p -> new PassengerInfo(p.getName(), p.getGender(), p.getAge()))
                     .toList();
             booking.setPassengers(passengers);
-            
+
             Booking savedBooking = bookingRepository.save(booking);
-            
-            flightServiceClient.updateFlightSeats(request.getFlightId(), request.getSelectedSeats());            
+
+            flightServiceClient.updateFlightSeats(request.getFlightId(), request.getSelectedSeats());
+
             BookingEvent event = new BookingEvent(
-                savedBooking.getPnr(),
-                savedBooking.getUserEmail(),
-                savedBooking.getUserName(),
-                savedBooking.getFlightId(),
-                savedBooking.getNumberOfSeats(),
-                savedBooking.getTotalPrice(),
-                "CONFIRMED",
-                System.currentTimeMillis()
+                    savedBooking.getPnr(),
+                    savedBooking.getUserEmail(),
+                    savedBooking.getUserName(),
+                    savedBooking.getFlightId(),
+                    savedBooking.getNumberOfSeats(),
+                    savedBooking.getTotalPrice(),
+                    "CONFIRMED",
+                    System.currentTimeMillis()
             );
             bookingPublisher.publishBookingConfirmation(event);
             log.info("Flight booking confirmed with PNR: {}", savedBooking.getPnr());
             return convertToBookingResponse(savedBooking);
 
         } catch (BadRequestException | ResourceNotFoundException e) {
-            // Re-throw known business exceptions so they aren't wrapped
             throw e;
         } catch (Exception e) {
             log.error("Error during flight booking", e);
@@ -121,30 +122,32 @@ public class BookingService {
     public BookingResponse cancelBooking(String pnr) {
         log.info("Processing cancellation for booking: {}", pnr);
         Optional<Booking> bookingOptional = bookingRepository.findByPnr(pnr);
-        
+
         if (bookingOptional.isEmpty()) {
             throw new ResourceNotFoundException("Booking not found");
         }
-        
+
         Booking booking = bookingOptional.get();
+
         if (booking.getBookingStatus() == BookingStatus.CANCELLED) {
             throw new ResourceNotFoundException("Ticket with pnr " + pnr + " already cancelled");
         }
+
         LocalDate journeyDate = booking.getJourneyDate();
         LocalDate today = LocalDate.now();
         long daysUntilJourney = ChronoUnit.DAYS.between(today, journeyDate);
-        
+
         if (daysUntilJourney <= 0) {
             throw new BadRequestException("Cancellation not allowed. Journey date has passed.");
         }
         if (daysUntilJourney < 1) {
             throw new BadRequestException("Cancellation not allowed. Less than 24 hours before journey.");
         }
-        
+
         booking.setBookingStatus(BookingStatus.CANCELLED);
         booking.setUpdatedAt(System.currentTimeMillis());
         Booking cancelledBooking = bookingRepository.save(booking);
-        
+
         flightServiceClient.releaseFlightSeats(booking.getFlightId(), booking.getSelectedSeats());
         log.info("Booking cancelled successfully: {}", pnr);
         return convertToBookingResponse(cancelledBooking);
@@ -156,30 +159,31 @@ public class BookingService {
 
     private BookingResponse convertToBookingResponse(Booking booking) {
         return new BookingResponse(
-            booking.getBookingId(),
-            booking.getPnr(),
-            booking.getFlightId(),
-            booking.getUserEmail(),
-            booking.getUserName(),
-            booking.getNumberOfSeats(),
-            booking.getSelectedSeats(),
-            booking.getMealPreference(),
-            booking.getTotalPrice(),
-            booking.getBookingStatus(),
-            booking.getJourneyDate(),
-            booking.getCreatedAt()
+                booking.getBookingId(),
+                booking.getPnr(),
+                booking.getFlightId(),
+                booking.getUserEmail(),
+                booking.getUserName(),
+                booking.getNumberOfSeats(),
+                booking.getSelectedSeats(),
+                booking.getMealPreference(),
+                booking.getTotalPrice(),
+                booking.getBookingStatus(),
+                booking.getJourneyDate(),
+                booking.getCreatedAt(),
+                booking.getPassengers() 
         );
     }
-    
+
     @SuppressWarnings("unused")
     public BookingResponse bookingFallback(BookingRequest request, Exception e) {
         log.error("Circuit breaker triggered for flight booking", e);
-        throw new ServiceUnavailableExceptionTest("Flight service is currently unavailable. Please try again later.");
+        throw new ServiceUnavailableException("Flight service is currently unavailable. Please try again later.");
     }
-    
+
     @SuppressWarnings("unused")
     public BookingResponse cancelBookingFallback(String pnr, Exception e) {
         log.error("Circuit breaker triggered for booking cancellation", e);
-        throw new ServiceUnavailableExceptionTest("Flight service is currently unavailable. Cancellation failed.");
+        throw new ServiceUnavailableException("Flight service is currently unavailable. Cancellation failed.");
     }
 }
