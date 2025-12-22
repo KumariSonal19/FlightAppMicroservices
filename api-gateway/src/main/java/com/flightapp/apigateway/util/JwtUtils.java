@@ -1,5 +1,8 @@
 package com.flightapp.apigateway.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -17,7 +20,8 @@ public class JwtUtils {
 
     @Value("${app.jwtSecret}")
     private String jwtSecret;
-
+    private static final Logger log = LoggerFactory.getLogger(JwtUtils.class);
+    
     @SuppressWarnings("unchecked")
     public List<String> getRolesFromJwtToken(String token) {
         log.debug("Extracting roles from JWT token");

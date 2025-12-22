@@ -1,6 +1,9 @@
 package com.flightapp.apigateway.filter;
 
 import com.flightapp.apigateway.util.JwtUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -18,6 +21,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
     @Autowired
     private JwtUtils jwtUtils;
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
     private static final String FLIGHT_SEARCH_PATH = "/api/flight/search";
 
     public JwtAuthenticationFilter() {
