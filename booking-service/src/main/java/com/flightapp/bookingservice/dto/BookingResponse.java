@@ -1,5 +1,6 @@
 package com.flightapp.bookingservice.dto;
 
+import com.flightapp.bookingservice.entity.PassengerInfo; 
 import com.flightapp.bookingservice.enums.BookingStatus;
 import com.flightapp.bookingservice.enums.MealPreference;
 import lombok.AllArgsConstructor;
@@ -19,9 +20,10 @@ public class BookingResponse {
     private String userName;
     private Integer numberOfSeats;
     private List<String> selectedSeats;
-    private MealPreference mealPreference;
+    private MealPreference mealPreference; 
     private Double totalPrice;
-    private BookingStatus bookingStatus;
+    private BookingStatus bookingStatus; 
     private LocalDate journeyDate;
     private Long createdAt;
+    private List<PassengerInfo> passengers;
 }
