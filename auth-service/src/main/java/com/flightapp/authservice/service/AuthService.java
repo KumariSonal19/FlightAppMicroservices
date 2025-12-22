@@ -41,6 +41,8 @@ public class AuthService {
     @Autowired
     JwtUtils jwtUtils;
 
+ // Inside com.flightapp.authservice.service.AuthService
+
     public JwtResponse authenticateUser(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
@@ -53,22 +55,47 @@ public class AuthService {
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
 
+        // ✅ NEW LOGIC STARTS HERE
+        boolean isPasswordExpired = false;
+        
+        // 1. Fetch the user entity to get 'lastPasswordReset'
+        User user = userRepository.findById(userDetails.getId()).orElse(null);
+        
+        if (user != null && user.getLastPasswordReset() != null) {
+            // 2. Define expiration time (1 Day in Milliseconds)
+            long EXPIRATION_TIME = 24 * 60 * 60 * 1000L; 
+            
+            // 3. Check difference
+            long timeDiff = System.currentTimeMillis() - user.getLastPasswordReset();
+            
+            System.out.println("DEBUG: Current Time: " + System.currentTimeMillis());
+            System.out.println("DEBUG: User Reset Time: " + user.getLastPasswordReset());
+            System.out.println("DEBUG: Time Diff: " + timeDiff);
+            System.out.println("DEBUG: Is Expired? " + (timeDiff > EXPIRATION_TIME));
+            
+            if (timeDiff > EXPIRATION_TIME) {
+                isPasswordExpired = true;
+            }
+        }
+
+        // 4. Update Constructor Call (Pass 'isPasswordExpired' at the end)
         return new JwtResponse(
                 userDetails.getId(),
                 userDetails.getUsername(),
                 userDetails.getEmail(),
                 roles,
-                jwt
+                jwt,
+                isPasswordExpired 
         );
     }
 
     public MessageResponse registerUser(SignupRequest signUpRequest) {
         if (userRepository.existsByUsername(signUpRequest.getUsername())) {
-            throw new RuntimeException("Error: Username is already taken!");
+            throw new RuntimeException("Username is already taken.");
         }
 
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-            throw new RuntimeException("Error: Email is already in use!");
+            throw new RuntimeException("Email already registered.");
         }
 
         User user = new User(signUpRequest.getUsername(),
