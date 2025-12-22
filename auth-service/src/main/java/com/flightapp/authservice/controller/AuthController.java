@@ -63,6 +63,7 @@ public class AuthController {
         }
 
         user.setPassword(encoder.encode(request.getNewPassword()));
+        user.setLastPasswordReset(System.currentTimeMillis());
         userRepository.save(user);
 
         return ResponseEntity.ok(new MessageResponse("Password updated successfully!"));
